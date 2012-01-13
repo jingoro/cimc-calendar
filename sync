@@ -1,0 +1,63 @@
+#!/usr/bin/env ruby
+
+require File.expand_path('../lib/setup', __FILE__)
+
+run_datetime = Time.now
+max_updated_at = CIMC::Event.maximum(:updated_at)
+if max_updated_at && max_updated_at >= run_datetime
+  raise "max updated_at >= now (#{max_updated_at} >= #{run_datetime})"
+end
+
+# Schedule new events to be added or, if they exist, update updated_at
+events = CIMC::Scraper.events
+raise "too few events, please check connection" if events.size < 10
+
+events.each do |data|
+  event = CIMC::Event.build_from_scraped_data(data)
+  if existing = CIMC::Event.where(:event_hash => event.event_hash).first
+    if existing.gcal_status == 'to_remove'
+      existing.update_attributes!(:gcal_status => 'added')
+      puts "Unscheduled remove: #{event.title}"
+    else
+      existing.update_attributes!(:updated_at => Time.now)
+    end
+  else
+    event.save!
+    puts "Schedule add: #{event.title}"
+  end
+end
+
+# Schedule untouched events to be removed or, if not already added, destroy them
+CIMC::Event.where("updated_at < ?", run_datetime).each do |event|
+  if event.gcal_status == 'to_add'
+    puts "Unscheduled add: #{event.title}"
+    event.destroy
+  else
+    puts "Schedule remove: #{event.title}"
+    event.update_attributes!(:gcal_status => 'to_remove')
+  end
+end
+
+calendar = CIMC::Calendar.new
+
+# Add scheduled events
+CIMC::Event.where(:gcal_status => 'to_add').each do |event|
+  gcal_id = calendar.add(event)
+  if gcal_id
+    puts "Calendar event added: #{event.title}"
+    event.update_attributes!(:gcal_status => 'added', :gcal_id => gcal_id)
+  else
+    puts "ERROR: Could not add #{event.title}"
+  end
+end
+
+# Remove scheduled events
+CIMC::Event.where(:gcal_status => 'to_remove').each do |event|
+  result = calendar.delete(event.gcal_id)
+  if result.response[0] == 204
+    event.destroy
+    puts "Calendar event removed: #{event.title}"
+  else
+    puts "ERROR: Could not remove #{event.title}"
+  end
+end

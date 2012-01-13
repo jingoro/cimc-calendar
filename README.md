@@ -1,0 +1,1 @@
+A Ruby hack to transform the [CIMC Scheduler Site](https://clients.mindbodyonline.com/ASP/home.asp?studioid=11692) site into a [Google Calendar](https://www.google.com/calendar/b/0/embed?src=6rggv4oi29bdskiaktlkr0ob90@group.calendar.google.com&ctz=America/New_York).

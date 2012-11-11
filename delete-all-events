@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+
+require File.expand_path('../lib/setup', __FILE__)
+
+calendar = CIMC::Calendar.new
+
+calendar.events.each do |event|
+  puts "Calendar event removed: #{event.summary}"
+  calendar.delete(event.id)
+end
